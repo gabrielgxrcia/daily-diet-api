@@ -1,14 +1,16 @@
-import { Knex } from "knex";
-
+import { Knex } from 'knex'
 
 export async function up(knex: Knex): Promise<void> {
   await knex.schema.alterTable('users', (table) => {
-    table.uuid('session_id').after('height').notNullable().index()
+    table.uuid('session_id').after('height').index().nullable()
 
-    table.text("created_at").defaultTo(knex.fn.now()).notNullable().after("session_id");
+    table
+      .text('created_at')
+      .defaultTo(knex.fn.now())
+      .after('session_id')
+      .notNullable()
   })
 }
-
 
 export async function down(knex: Knex): Promise<void> {
   await knex.schema.alterTable('users', (table) => {
@@ -16,4 +18,3 @@ export async function down(knex: Knex): Promise<void> {
     table.dropColumn('created_at')
   })
 }
-

@@ -1,6 +1,6 @@
 import { FastifyInstance, FastifyRequest } from 'fastify'
 import { knex } from '../database'
-import crypto from 'node:crypto'
+import crypto, { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 
 interface User {
@@ -14,6 +14,17 @@ interface User {
 
 export async function registerUser(app: FastifyInstance) {
   app.post('/', async (request, response) => {
+    let sessionId = request.cookies.sessionId;
+
+    if(!sessionId) {
+      sessionId = randomUUID();
+
+      response.cookie('sessionId', sessionId, {
+        path: '/meals',
+        maxAge: 1000 * 60 * 60 * 24 * 7, // 7 days
+      })
+    }
+
     const { name, email, address, weight, height } = parseRequestData(request);
 
     const existingUser = await FindUserByEmail(email);
@@ -28,7 +39,8 @@ export async function registerUser(app: FastifyInstance) {
       email,
       address,
       weight,
-      height
+      height,
+      session_id: sessionId,
     }
 
     await createUser(newUser)

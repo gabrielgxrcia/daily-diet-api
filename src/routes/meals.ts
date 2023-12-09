@@ -15,28 +15,78 @@ export async function mealsRoutes(app: FastifyInstance) {
   app.post('/', createMealHandler);
   app.get('/', getMealsHandler);
   app.get('/:id', getMealHandler);
+  app.get('/summary', getMealsSummaryHandler);
 }
 
 async function createMealHandler(request: FastifyRequest, response: FastifyReply) {
-  const { name, description, isOnTheDiet } = parseMealData(request);
+  try {
+    const sessionId = request.cookies.sessionId;
 
-  await createMeal(name, description, isOnTheDiet);
+    if (!sessionId) {
+      throw new Error('sessionId not found.');
+    }
 
-  response.status(201).send();
+    const user = await getUserBySessionId(sessionId);
+
+    if (!user) {
+      throw new Error('User not found.');
+    }
+
+    const { name, description, isOnTheDiet } = parseMealData(request);
+
+    await createMeal(user.id, name, description, isOnTheDiet);
+
+    response.status(201).send();
+  } catch (error: unknown) {
+    response.status(401).send({
+      error: (error as Error).message,
+    });
+  }
 }
 
 async function getMealsHandler() {
   const meals = await knex<Meal>('meals').select();
-
   return { meals };
 }
 
 async function getMealHandler(request: FastifyRequest) {
-  const params = getMealParams(request);
+  try {
+    const params = getMealParams(request);
+    const meal = await knex<Meal>('meals').where('id', params.id).first();
+    return { meal };
+  } catch (error: unknown) {
+    return { error: (error as Error).message };
+  }
+}
 
-  const meal = await knex<Meal>('meals').where('id', params.id).first();
+async function getMealsSummaryHandler() {
+  try {
+    const count = await knex('meals').count('id', {
+      as: 'Total de refeições registradas',
+    });
 
-  return { meal };
+    const refDieta = await knex('meals')
+      .count('id', { as: 'Total de refeições dentro da dieta' })
+      .where('is_on_diet', true);
+
+    const refForaDieta = await knex('meals')
+      .count('id', { as: 'Total de refeições fora da dieta' })
+      .where('is_on_diet', false);
+
+    const summary = {
+      'Total de refeições registradas': parseInt(count[0]['Total de refeições registradas'] as string),
+      'Total de refeições dentro da dieta': parseInt(refDieta[0]['Total de refeições dentro da dieta'] as string),
+      'Total de refeições fora da dieta': parseInt(refForaDieta[0]['Total de refeições fora da dieta'] as string),
+    };
+
+    return { summary };
+  } catch (error: unknown) {
+    return { error: (error as Error).message };
+  }
+}
+
+async function getUserBySessionId(sessionId: string) {
+  return await knex('users').where('session_id', sessionId).select('id').first();
 }
 
 function parseMealData(request: FastifyRequest) {
@@ -57,9 +107,7 @@ function getMealParams(request: FastifyRequest) {
   return getMealParamsSchema.parse(request.params);
 }
 
-async function createMeal(name: string, description: string, is_on_diet: boolean) {
-  const userId = crypto.randomUUID();
-
+async function createMeal(userId: string, name: string, description: string, is_on_diet: boolean) {
   await knex<Meal>('meals').insert({
     id: crypto.randomUUID(),
     user_id: userId,
