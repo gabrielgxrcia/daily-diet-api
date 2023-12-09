@@ -2,46 +2,119 @@
 
 ## Cadastro de Usuário
 
-* [RF-01] Deve ser possível criar um usuário.
+- [x] Deve ser possível criar um usuário.
 
 ## Identificação do Usuário
 
-* [RF-02] Deve ser possível identificar o usuário entre as requisições.
+- [x] Deve ser possível identificar o usuário entre as requisições.
 
 ## Registro de Refeição
 
-* [RF-03] Deve ser possível registrar uma refeição com as seguintes informações:
-    * [RF-03-1] Nome
-    * [RF-03-2] Descrição
-    * [RF-03-3] Data e Hora
-    * [RF-03-4] Está dentro ou fora da dieta.
+- [x] Deve ser possível registrar uma refeição com as seguintes informações:
+    - [x] Nome
+    - [x] Descrição
+    - [x] Data e Hora
+    - [x] Está dentro ou fora da dieta.
 
 ## Edição de Refeição
 
-* [RF-04] Deve ser possível editar uma refeição, permitindo a alteração de todos os dados mencionados acima.
+- [ ] Deve ser possível editar uma refeição, permitindo a alteração de todos os dados mencionados acima.
 
 ## Exclusão de Refeição
 
-* [RF-05] Deve ser possível apagar uma refeição.
+- [ ] Deve ser possível apagar uma refeição.
 
 ## Listagem de Refeições
 
-* [RF-06] Deve ser possível listar todas as refeições de um usuário.
+- [x] Deve ser possível listar todas as refeições de um usuário.
 
 ## Visualização de Refeição Individual
 
-* [RF-07] Deve ser possível visualizar detalhes de uma única refeição.
+- [x] Deve ser possível visualizar detalhes de uma única refeição.
 
 ## Recuperação de Métricas do Usuário
 
-* [RF-08] Deve ser possível recuperar métricas de um usuário, incluindo:
-    * [RF-08-1] Quantidade total de refeições registradas.
-    * [RF-08-2] Quantidade total de refeições dentro da dieta.
-    * [RF-08-3] Quantidade total de refeições fora da dieta.
-    * [RF-08-4] Melhor sequência por dia de refeições dentro da dieta.
+- [x] Deve ser possível recuperar métricas de um usuário, incluindo:
+    - [x] Quantidade total de refeições registradas.
+    - [x] Quantidade total de refeições dentro da dieta.
+    - [x] Quantidade total de refeições fora da dieta.
+    - [ ] Melhor sequência por dia de refeições dentro da dieta.
 
 # Regras de Negócio (RN)
 
 ## Restrição de Acesso a Refeições
 
-* [RN-01] O usuário só pode visualizar, editar e apagar as refeições que ele criou.
+- [ ] O usuário só pode visualizar, editar e apagar as refeições que ele criou.
+
+## Instalação
+
+```bash
+# Clone o repositório
+git clone git@github.com:gabrielgxrcia/daily-diet-api.git
+
+# Instale as dependências do projeto
+npm install
+
+# Execute o projeto no ambiente de desenvolvimento
+npm run dev
+
+# Execute as migrations para criar o banco de dados
+npm run knex -- migrate:latest
+```
+
+## Documentação e rotas
+- Criar novo usuário
+
+```http
+  POST /users
+```
+
+| Parâmetro   | Tipo       | Descrição                           |
+| :---------- | :--------- | :---------------------------------- |
+| `name` | `Body - String` | **Obrigatório**. Nome do usuário. |
+| `email` | `Body - String` | **Obrigatório**. Email do usuário. |
+| `address` | `Body - String` | **Obrigatório**. Endereço do usuário. |
+| `weight` | `Body - Number` | **Obrigatório**. Peso do usuário. |
+| `height` | `Body - Number` | **Obrigatório**. Altura do usuário. |
+
+- Criar novo registro de refeição
+
+```http
+  POST /meals
+```
+
+| Parâmetro   | Tipo       | Descrição                           |
+| :---------- | :--------- | :---------------------------------- |
+| `name` | `Body - String` | **Obrigatório**. Nome da refeição. |
+| `description` | `Body - String` | **Obrigatório**. Descrição da refeição. |
+| `is_on_diet` | `Body - Boolean` | **Obrigatório**. Indica se a refeição está na dieta. |
+
+- Listar todas refeições registradas pelo usuário
+
+```http
+  GET /meals
+```
+
+| Parâmetro   | Tipo       | Descrição                           |
+| :---------- | :--------- | :---------------------------------- |
+| `user_id` | `Query Param` | **Opcional**. ID do usuário para filtras as métricas. |
+
+- Listar uma refeição específica registrada pelo usuário
+
+```http
+  GET /meals/:${meal_id}
+```
+
+| Parâmetro   | Tipo       | Descrição                           |
+| :---------- | :--------- | :---------------------------------- |
+| `meal_id` | `Path Parameter` | **Obrigatório**. ID da refeição a ser consultada. |
+
+- Mostrar um resumo geral das refeições cadastradas pelo usuário (total de refeições, refeições dentro da dieta e refeições fora da dieta)
+
+```http
+  GET /meals/summary
+```
+
+| Parâmetro   | Tipo       | Descrição                           |
+| :---------- | :--------- | :---------------------------------- |
+| `user_id` | `Query Param` | **Opcional**. ID do usuário para filtras as métricas. |
