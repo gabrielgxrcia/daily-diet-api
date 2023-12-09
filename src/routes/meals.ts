@@ -2,6 +2,7 @@ import { FastifyInstance, FastifyRequest, FastifyReply } from "fastify";
 import { knex } from '../database';
 import crypto from 'node:crypto';
 import { z } from 'zod';
+import { checkSessionIdExists } from "../middleware/check-session-id-exists";
 
 interface Meal {
   id: string;
@@ -11,82 +12,92 @@ interface Meal {
   is_on_diet: boolean;
 }
 
+interface Summary {
+  'Total de refeições registradas': number;
+  'Total de refeições dentro da dieta': number;
+  'Total de refeições fora da dieta': number;
+}
+
 export async function mealsRoutes(app: FastifyInstance) {
-  app.post('/', createMealHandler);
-  app.get('/', getMealsHandler);
-  app.get('/:id', getMealHandler);
-  app.get('/summary', getMealsSummaryHandler);
+  app.post('/', { preHandler: [checkSessionIdExists] }, createMealHandler);
+  app.get('/', { preHandler: [checkSessionIdExists] }, getMealsHandler);
+  app.get('/:id', { preHandler: [checkSessionIdExists] }, getMealHandler);
+  app.get('/summary', { preHandler: [checkSessionIdExists] }, getMealsSummaryHandler);
 }
 
 async function createMealHandler(request: FastifyRequest, response: FastifyReply) {
   try {
-    const sessionId = request.cookies.sessionId;
-
-    if (!sessionId) {
-      throw new Error('sessionId not found.');
-    }
-
-    const user = await getUserBySessionId(sessionId);
-
-    if (!user) {
-      throw new Error('User not found.');
-    }
-
     const { name, description, isOnTheDiet } = parseMealData(request);
 
-    await createMeal(user.id, name, description, isOnTheDiet);
+    if (!request.user) {
+      throw new Error('User not found');
+    }
+
+    await createMeal(request.user.id, name, description, isOnTheDiet);
 
     response.status(201).send();
   } catch (error: unknown) {
-    response.status(401).send({
-      error: (error as Error).message,
-    });
+    response.status(401).send({ error: (error as Error).message });
   }
 }
 
-async function getMealsHandler() {
-  const meals = await knex<Meal>('meals').select();
-  return { meals };
+async function getMealsHandler(request: FastifyRequest, response: FastifyReply) {
+  if (!request.user) {
+    return response.status(401).send({
+      error: 'User not found.',
+    });
+  }
+
+  const userId = request.user.id;
+
+  const meals = await knex<Meal>('meals').where('user_id', userId).select();
+  return { meals } as { meals: Meal[] };
 }
 
 async function getMealHandler(request: FastifyRequest) {
   try {
     const params = getMealParams(request);
     const meal = await knex<Meal>('meals').where('id', params.id).first();
-    return { meal };
+    return { meal } as { meal: Meal | undefined };
   } catch (error: unknown) {
-    return { error: (error as Error).message };
+    return { error: (error as Error).message } as { error: string };
   }
 }
 
-async function getMealsSummaryHandler() {
+async function getMealsSummaryHandler(request: FastifyRequest, response: FastifyReply) {
+  if (!request.user) {
+    return response.status(401).send({
+      error: 'User not found.',
+    });
+  }
+
+  const userId = request.user.id;
+
   try {
     const count = await knex('meals').count('id', {
       as: 'Total de refeições registradas',
-    });
+    }).where('user_id', userId);
 
     const refDieta = await knex('meals')
       .count('id', { as: 'Total de refeições dentro da dieta' })
-      .where('is_on_diet', true);
+      .where('is_on_diet', true)
+      .andWhere('user_id', userId);
 
     const refForaDieta = await knex('meals')
       .count('id', { as: 'Total de refeições fora da dieta' })
-      .where('is_on_diet', false);
+      .where('is_on_diet', false)
+      .andWhere('user_id', userId);
 
-    const summary = {
+    const summary: Summary = {
       'Total de refeições registradas': parseInt(count[0]['Total de refeições registradas'] as string),
       'Total de refeições dentro da dieta': parseInt(refDieta[0]['Total de refeições dentro da dieta'] as string),
       'Total de refeições fora da dieta': parseInt(refForaDieta[0]['Total de refeições fora da dieta'] as string),
     };
 
-    return { summary };
+    return { summary } as { summary: Summary };
   } catch (error: unknown) {
-    return { error: (error as Error).message };
+    return { error: (error as Error).message } as { error: string };
   }
-}
-
-async function getUserBySessionId(sessionId: string) {
-  return await knex('users').where('session_id', sessionId).select('id').first();
 }
 
 function parseMealData(request: FastifyRequest) {
