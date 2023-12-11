@@ -18,11 +18,11 @@
 
 ## Edição de Refeição
 
-- [ ] Deve ser possível editar uma refeição, permitindo a alteração de todos os dados mencionados acima.
+- [x] Deve ser possível editar uma refeição, permitindo a alteração de todos os dados mencionados acima.
 
 ## Exclusão de Refeição
 
-- [ ] Deve ser possível apagar uma refeição.
+- [x] Deve ser possível apagar uma refeição.
 
 ## Listagem de Refeições
 
@@ -38,13 +38,13 @@
     - [x] Quantidade total de refeições registradas.
     - [x] Quantidade total de refeições dentro da dieta.
     - [x] Quantidade total de refeições fora da dieta.
-    - [ ] Melhor sequência por dia de refeições dentro da dieta.
+    - [x] Melhor sequência por dia de refeições dentro da dieta.
 
 # Regras de Negócio (RN)
 
 ## Restrição de Acesso a Refeições
 
-- [ ] O usuário só pode visualizar, editar e apagar as refeições que ele criou.
+- [x] O usuário só pode visualizar, editar e apagar as refeições que ele criou.
 
 ## Instalação
 
@@ -118,3 +118,22 @@ npm run knex -- migrate:latest
 | Parâmetro   | Tipo       | Descrição                           |
 | :---------- | :--------- | :---------------------------------- |
 | `user_id` | `Query Param` | **Opcional**. ID do usuário para filtras as métricas. |
+
+```http
+  PUT /meals/:${meal_id}
+```
+
+| Parâmetro   | Tipo       | Descrição                           |
+| :---------- | :--------- | :---------------------------------- |
+| `meal_id` | `Path Parameter` | **Obrigatório**. ID da refeição a ser editada. |
+| `name` | `Body - String` | **Opcional**. Novo nome da refeição. |
+| `description` | `Body - String` | **Obrigatório**. Nova descrição da refeição. |
+| `is_on_diet` | `Body - Boolean` | **Obrigatório**. Indica se a refeição está agora na dieta. |
+
+```http
+  DELETE /meals/:${meal_id}
+```
+
+| Parâmetro   | Tipo       | Descrição                           |
+| :---------- | :--------- | :---------------------------------- |
+| `meal_id` | `Path Parameter` | **Obrigatório**. ID da refeição a ser excluída. |

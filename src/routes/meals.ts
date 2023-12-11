@@ -22,19 +22,17 @@ export async function mealsRoutes(app: FastifyInstance) {
   app.post('/', { preHandler: [checkSessionIdExists] }, createMealHandler);
   app.get('/', { preHandler: [checkSessionIdExists] }, getMealsHandler);
   app.get('/:id', { preHandler: [checkSessionIdExists] }, getMealHandler);
-  app.get('/summary', { preHandler: [checkSessionIdExists] }, getMealsSummaryHandler);
+  app.put('/:id', { preHandler: [checkSessionIdExists] }, editMealHandler);
   app.delete('/:id', { preHandler: [checkSessionIdExists] }, deleteMealHandler);
+  app.get('/summary', { preHandler: [checkSessionIdExists] }, getMealsSummaryHandler);
 }
 
 async function createMealHandler(request: FastifyRequest, response: FastifyReply) {
   try {
     const { name, description, isOnTheDiet } = parseMealData(request);
+    const userId = getUserIdFromRequest(request);
 
-    if (!request.user) {
-      throw new Error('User not found');
-    }
-
-    await createMeal(request.user.id, name, description, isOnTheDiet);
+    await createMeal(userId, name, description, isOnTheDiet);
 
     response.status(201).send();
   } catch (error: unknown) {
@@ -43,59 +41,47 @@ async function createMealHandler(request: FastifyRequest, response: FastifyReply
 }
 
 async function getMealsHandler(request: FastifyRequest, response: FastifyReply) {
-  if (!request.user) {
-    return response.status(401).send({
-      error: 'User not found.',
-    });
+  try {
+    const userId = getUserIdFromRequest(request);
+    const meals = await getMealsByUserId(userId);
+
+    return { meals };
+  } catch (error: unknown) {
+    response.status(401).send({ error: (error as Error).message });
   }
-
-  const userId = request.user.id;
-
-  const meals = await knex<Meal>('meals').where('user_id', userId).select();
-  return { meals } as { meals: Meal[] };
 }
 
-async function getMealHandler(request: FastifyRequest) {
+async function getMealHandler(request: FastifyRequest, response: FastifyReply) {
   try {
     const params = getMealParams(request);
-    const meal = await knex<Meal>('meals').where('id', params.id).first();
-    return { meal } as { meal: Meal | undefined };
+    const meal = await getMealById(params.id);
+
+    return { meal };
   } catch (error: unknown) {
-    return { error: (error as Error).message } as { error: string };
+    response.status(401).send({ error: (error as Error).message });
+  }
+}
+
+async function editMealHandler(request: FastifyRequest, response: FastifyReply) {
+  try {
+    const params = getMealParams(request);
+    const { name, description, isOnTheDiet } = parseMealData(request);
+    const userId = getUserIdFromRequest(request);
+
+    await updateMeal(params.id, userId, name, description, isOnTheDiet);
+
+    response.status(202).send();
+  } catch (error: unknown) {
+    response.status(401).send({ error: (error as Error).message });
   }
 }
 
 async function deleteMealHandler(request: FastifyRequest, response: FastifyReply) {
   try {
-    const getMealParamsSchema = z.object({
-      id: z.string().uuid(),
-    });
+    const params = getMealParams(request);
+    const userId = getUserIdFromRequest(request);
 
-    const params = getMealParamsSchema.parse(request.params);
-
-    const { sessionId } = request.cookies;
-
-    const [user] = await knex('users')
-      .where('session_id', sessionId)
-      .select('id');
-
-    const userId = user.id;
-
-    const meal = await knex('meals')
-      .where('id', params.id)
-      .andWhere('user_id', userId)
-      .first();
-
-    if (!meal) {
-      return response.status(404).send({
-        error: 'Refeição não encontrada.',
-      });
-    }
-
-    await knex('meals')
-      .where('id', params.id)
-      .andWhere('user_id', userId)
-      .delete();
+    await deleteMeal(params.id, userId);
 
     response.status(204).send('Refeição deletada com sucesso.');
   } catch (error: unknown) {
@@ -104,39 +90,22 @@ async function deleteMealHandler(request: FastifyRequest, response: FastifyReply
 }
 
 async function getMealsSummaryHandler(request: FastifyRequest, response: FastifyReply) {
-  if (!request.user) {
-    return response.status(401).send({
-      error: 'User not found.',
-    });
-  }
-
-  const userId = request.user.id;
-
   try {
-    const count = await knex('meals').count('id', {
-      as: 'Total de refeições registradas',
-    }).where('user_id', userId);
+    const userId = getUserIdFromRequest(request);
+    const summary = await getMealsSummary(userId);
 
-    const refDieta = await knex('meals')
-      .count('id', { as: 'Total de refeições dentro da dieta' })
-      .where('is_on_diet', true)
-      .andWhere('user_id', userId);
-
-    const refForaDieta = await knex('meals')
-      .count('id', { as: 'Total de refeições fora da dieta' })
-      .where('is_on_diet', false)
-      .andWhere('user_id', userId);
-
-    const summary: Summary = {
-      'Total de refeições registradas': parseInt(count[0]['Total de refeições registradas'] as string),
-      'Total de refeições dentro da dieta': parseInt(refDieta[0]['Total de refeições dentro da dieta'] as string),
-      'Total de refeições fora da dieta': parseInt(refForaDieta[0]['Total de refeições fora da dieta'] as string),
-    };
-
-    return { summary } as { summary: Summary };
+    return { summary };
   } catch (error: unknown) {
-    return { error: (error as Error).message } as { error: string };
+    response.status(401).send({ error: (error as Error).message });
   }
+}
+
+function getUserIdFromRequest(request: FastifyRequest): string {
+  if (!request.user) {
+    throw new Error('User not found');
+  }
+
+  return request.user.id;
 }
 
 function parseMealData(request: FastifyRequest) {
@@ -165,4 +134,66 @@ async function createMeal(userId: string, name: string, description: string, is_
     description,
     is_on_diet,
   });
+}
+
+async function getMealsByUserId(userId: string): Promise<Meal[]> {
+  return await knex<Meal>('meals').where('user_id', userId).select();
+}
+
+async function getMealById(id: string): Promise<Meal | undefined> {
+  return await knex<Meal>('meals').where('id', id).first();
+}
+
+async function updateMeal(id: string, userId: string, name: string, description: string, is_on_diet: boolean) {
+  const updatedMeal = await knex<Meal>('meals')
+    .where('id', id)
+    .andWhere('user_id', userId)
+    .first()
+    .update({
+      name,
+      description,
+      is_on_diet,
+    });
+
+  if (!updatedMeal) {
+    throw new Error('Meal not found.');
+  }
+}
+
+async function deleteMeal(id: string, userId: string) {
+  const meal = await knex('meals')
+    .where('id', id)
+    .andWhere('user_id', userId)
+    .first();
+
+  if (!meal) {
+    throw new Error('Refeição não encontrada.');
+  }
+
+  await knex('meals')
+    .where('id', id)
+    .andWhere('user_id', userId)
+    .delete();
+}
+
+async function getMealsSummary(userId: string): Promise<Summary> {
+  const count = await knex('meals').count('id', {
+    as: 'Total de refeições registradas',
+  }).where('user_id', userId);
+
+  const refDieta = await knex('meals')
+    .count('id', { as: 'Total de refeições dentro da dieta' })
+    .where('is_on_diet', true)
+    .andWhere('user_id', userId);
+
+  const refForaDieta = await knex('meals')
+    .count('id', { as: 'Total de refeições fora da dieta' })
+    .where('is_on_diet', false)
+    .andWhere('user_id', userId);
+
+  return {
+    'Total de refeições registradas': parseInt(count[0]['Total de refeições registradas'] as string),
+    'Total de refeições dentro da dieta': parseInt(refDieta[0]['Total de refeições dentro da dieta'] as string),
+    'Total de refeições fora da dieta': parseInt(refForaDieta[0]['Total de refeições fora da dieta'] as string),
+  };
 }
