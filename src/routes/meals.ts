@@ -23,6 +23,7 @@ export async function mealsRoutes(app: FastifyInstance) {
   app.get('/', { preHandler: [checkSessionIdExists] }, getMealsHandler);
   app.get('/:id', { preHandler: [checkSessionIdExists] }, getMealHandler);
   app.get('/summary', { preHandler: [checkSessionIdExists] }, getMealsSummaryHandler);
+  app.delete('/:id', { preHandler: [checkSessionIdExists] }, deleteMealHandler);
 }
 
 async function createMealHandler(request: FastifyRequest, response: FastifyReply) {
@@ -61,6 +62,44 @@ async function getMealHandler(request: FastifyRequest) {
     return { meal } as { meal: Meal | undefined };
   } catch (error: unknown) {
     return { error: (error as Error).message } as { error: string };
+  }
+}
+
+async function deleteMealHandler(request: FastifyRequest, response: FastifyReply) {
+  try {
+    const getMealParamsSchema = z.object({
+      id: z.string().uuid(),
+    });
+
+    const params = getMealParamsSchema.parse(request.params);
+
+    const { sessionId } = request.cookies;
+
+    const [user] = await knex('users')
+      .where('session_id', sessionId)
+      .select('id');
+
+    const userId = user.id;
+
+    const meal = await knex('meals')
+      .where('id', params.id)
+      .andWhere('user_id', userId)
+      .first();
+
+    if (!meal) {
+      return response.status(404).send({
+        error: 'Refeição não encontrada.',
+      });
+    }
+
+    await knex('meals')
+      .where('id', params.id)
+      .andWhere('user_id', userId)
+      .delete();
+
+    response.status(204).send('Refeição deletada com sucesso.');
+  } catch (error: unknown) {
+    response.status(401).send({ error: (error as Error).message });
   }
 }
 
