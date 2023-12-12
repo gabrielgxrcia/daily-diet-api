@@ -87,8 +87,63 @@ describe('Users routes', () => {
 
     assert.isNotNull(newMeal, 'Novas refeições devem estar na lista');
   });
+
+  it('should be able to get a specific meals', async () => {
+    const timestamp = Date.now();
+    const testEmail = `email${timestamp}@example.com`;
+
+    // Cria um usuário para teste
+    const createUserResponse = await supertest(app.server)
+      .post('/users')
+      .send({
+        name: 'Gabriel',
+        email: testEmail,
+        address: 'Rua Teste, 999',
+        weight: 64.3,
+        height: 172,
+      });
+
+    const cookies = createUserResponse.get('Set-Cookie');
+
+    // Tenta obter o id do usuário fornecendo um e-mail que não foi usado anteriormente
+    const userId = await knex('users').select('id').where({ email: testEmail });
+
+    // Cria uma nova refeição
+    await supertest(app.server)
+      .post('/meals')
+      .send({
+        user_id: userId,
+        name: 'Refeição de Teste',
+        description: 'Teste',
+        isOnTheDiet: false,
+      })
+      .set('Cookie', cookies) 
+
+    // Lista todas as refeições
+    const listMealsResponse = await supertest(app.server)
+      .get('/meals')
+      .set('Cookie', cookies) 
+      .expect(200)
+
+    const mealId = listMealsResponse.body.meals[0].id
+
+    // Obtém os detalhes de uma refeição específica
+    const getMealResponse = await supertest(app.server)
+      .get(`/meals/${mealId}`)
+      .set('Cookie', cookies) 
+      .expect(200)
+
+    // Assegura que os detalhes da refeição correspondam aos valores esperados
+    expect(getMealResponse.body.meal).toEqual(
+      expect.objectContaining({
+        name: 'Refeição de Teste',
+        description: 'Teste',
+      }),
+    )
+  })
 });
 
+// Função auxiliar para encontrar um usuário pelo e-mail no banco de dados
 async function findUserByEmail(email: string) {
   return knex.select('*').from('users').where({ email }).first();
 }
