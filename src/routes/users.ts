@@ -30,7 +30,9 @@ export async function registerUser(app: FastifyInstance) {
     const existingUser = await FindUserByEmail(email);
 
     if (existingUser) {
-      throw new Error('This email address is already registered.');
+      return response.status(400).send({
+        error: 'Este email já está vinculado à um usuário',
+      })
     }
 
     const newUser = {
