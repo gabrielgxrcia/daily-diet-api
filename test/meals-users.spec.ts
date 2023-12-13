@@ -141,6 +141,69 @@ describe('Users routes', () => {
       }),
     )
   })
+
+  it('should be able to list the summary of meals', async () => {
+    const timestamp = Date.now();
+    const testEmail = `email${timestamp}@example.com`;
+  
+    // Criando um usuário para teste
+    const createUserResponse = await supertest(app.server)
+      .post('/users')
+      .send({
+        name: 'Gabriel',
+        email: testEmail,
+        address: 'Rua Teste, 999',
+        weight: 64.3,
+        height: 172,
+      });
+  
+    const cookies = createUserResponse.get('Set-Cookie');
+    const user = await knex('users').select('id').where({ email: testEmail });
+  
+    // Criando algumas refeições para o usuário
+    await supertest(app.server)
+      .post('/meals')
+      .send({
+        user_id: user[0].id,
+        name: 'Refeição de Teste 1',
+        description: 'Teste',
+        isOnTheDiet: false,
+      })
+      .set('Cookie', cookies);
+  
+    await supertest(app.server)
+      .post('/meals')
+      .send({
+        user_id: user[0].id,
+        name: 'Refeição de Teste 2',
+        description: 'Teste',
+        isOnTheDiet: true,
+      })
+      .set('Cookie', cookies);
+  
+    await supertest(app.server)
+      .post('/meals')
+      .send({
+        user_id: user[0].id,
+        name: 'Refeição de Teste 3',
+        description: 'Teste',
+        isOnTheDiet: false,
+      })
+      .set('Cookie', cookies);
+  
+    // Obtendo o resumo
+    const summaryResponse = await supertest(app.server)
+      .get('/meals/summary')
+      .set('Cookie', cookies)
+      .expect(200);
+  
+    // Verificando se o resumo retornado está correto
+    expect(summaryResponse.body.summary).toEqual({
+      'Total de refeições registradas': 3,
+      'Total de refeições dentro da dieta': 1,
+      'Total de refeições fora da dieta': 2,
+    });
+  });
 });
 
 // Função auxiliar para encontrar um usuário pelo e-mail no banco de dados
