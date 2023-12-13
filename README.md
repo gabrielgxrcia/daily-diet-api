@@ -137,3 +137,17 @@ npm run knex -- migrate:latest
 | Parâmetro   | Tipo       | Descrição                           |
 | :---------- | :--------- | :---------------------------------- |
 | `meal_id` | `Path Parameter` | **Obrigatório**. ID da refeição a ser excluída. |
+
+## Testes E2E
+  - [x] Should be able to create a new account
+  - [x] Should be able to create a new meal
+  - [x] Should be able to list all meals
+  - [x] Should be able to get a specific meals
+  - [x] Should be able to get the summary meals
+  - [x] Should be able to delete a specific meal
+  - [x] Should be able to edit a meal
+
+```bash
+# Após a instalação do projeto e suas depêndencias:
+  npm test
+```

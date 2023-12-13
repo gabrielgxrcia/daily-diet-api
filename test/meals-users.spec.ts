@@ -244,6 +244,53 @@ describe('Users routes', () => {
       .set('Cookie', cookies)
       .expect(204)
   })
+
+  it('should be able to edit a meal', async () => {
+    const testEmail = `email${Date.now()}@example.com`;
+
+    const createUserResponse = await supertest(app.server)
+    .post('/users')
+    .send({
+      name: 'Gabriel',
+      email: testEmail,
+      address: 'Rua Teste, 999',
+      weight: 64.3,
+      height: 172,
+    });
+
+    const cookies = createUserResponse.get('Set-Cookie')
+
+    const userId = await knex('users').select('id').where({ email: testEmail })
+
+    await supertest(app.server)
+      .post('/meals')
+      .send({
+        user_id: userId,
+        name: 'Refeição de Teste',
+        description: 'Teste',
+        isOnTheDiet: false,
+      })
+      .set('Cookie', cookies)
+
+    const listMealsResponse = await supertest(app.server)
+      .get('/meals')
+      .set('Cookie', cookies)
+      .expect(200)
+
+    // Recuperando o id da refeição
+    const mealId = listMealsResponse.body.meals[0].id
+
+    await supertest(app.server)
+      .put(`/meals/${mealId}`)
+      .set('Cookie', cookies)
+      .send({
+        user_id: userId,
+        name: 'Mamão - Editado',
+        description: 'Comer em todas as refeições - Editado',
+        isOnTheDiet: true,
+      })
+      .expect(202)
+  })
 })
 
 // Função auxiliar para encontrar um usuário pelo e-mail no banco de dados
